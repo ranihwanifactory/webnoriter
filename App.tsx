@@ -53,8 +53,21 @@ const App: React.FC = () => {
             <Route path="/game/:id" element={<GameDetails user={user} />} />
           </Routes>
         </main>
-        <footer className="bg-white border-t py-6 text-center text-gray-500">
-          <p>&copy; 2024 방구석놀이터. 즐거운 방학 보내세요! 🎈</p>
+        <footer className="bg-white border-t py-8 text-center text-gray-500">
+          <div className="container mx-auto px-4">
+            <p className="mb-2">© 2024 방구석놀이터. 즐거운 방학 보내세요! 🎈</p>
+            <p className="text-sm">
+              제작자 출처 : 
+              <a 
+                href="https://ranihwanibaby.tistory.com/" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="ml-1 text-pink-400 hover:text-pink-600 font-bold underline transition-colors"
+              >
+                great80k
+              </a>
+            </p>
+          </div>
         </footer>
       </div>
     </HashRouter>
