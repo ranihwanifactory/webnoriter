@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { doc, getDoc, collection, query, where, orderBy, onSnapshot, addDoc, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, onSnapshot, addDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Game, Review, User } from '../types';
 import { getYouTubeEmbedUrl } from '../utils/youtube';
@@ -22,27 +22,39 @@ const GameDetails: React.FC<GameDetailsProps> = ({ user }) => {
     if (!id) return;
 
     const fetchGame = async () => {
-      const docRef = doc(db, 'games', id);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        setGame({ id: docSnap.id, ...docSnap.data() } as Game);
+      try {
+        const docRef = doc(db, 'games', id);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          setGame({ id: docSnap.id, ...docSnap.data() } as Game);
+        }
+      } catch (err) {
+        console.error("Game fetch error:", err);
       }
       setLoading(false);
     };
 
     fetchGame();
 
+    // 복합 인덱스 오류를 피하기 위해 orderBy를 제거하고 클라이언트에서 정렬합니다.
     const reviewsQ = query(
       collection(db, 'reviews'), 
-      where('gameId', '==', id),
-      orderBy('createdAt', 'desc')
+      where('gameId', '==', id)
     );
+
     const unsubscribe = onSnapshot(reviewsQ, (snapshot) => {
       const reviewList = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as Review[];
+      
+      // 최신순으로 클라이언트에서 직접 정렬
+      reviewList.sort((a, b) => b.createdAt - a.createdAt);
+      
       setReviews(reviewList);
+    }, (error) => {
+      console.error("Reviews snapshot error:", error);
+      // 인덱스 등의 문제로 실시간 업데이트가 실패할 경우 사용자에게 알릴 수 있습니다.
     });
 
     return () => unsubscribe();
@@ -50,7 +62,11 @@ const GameDetails: React.FC<GameDetailsProps> = ({ user }) => {
 
   const handleSubmitReview = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !id || !newComment.trim()) return;
+    if (!user) {
+      alert("로그인이 필요합니다!");
+      return;
+    }
+    if (!id || !newComment.trim()) return;
 
     try {
       await addDoc(collection(db, 'reviews'), {
@@ -64,14 +80,20 @@ const GameDetails: React.FC<GameDetailsProps> = ({ user }) => {
       });
       setNewComment('');
       setNewRating(5);
-    } catch (error) {
+      alert("리뷰가 등록되었습니다! ✨");
+    } catch (error: any) {
       console.error("Error adding review:", error);
+      alert("리뷰 등록에 실패했습니다. (권한이나 데이터베이스 설정을 확인해주세요)");
     }
   };
 
   const handleDeleteReview = async (reviewId: string) => {
     if (window.confirm('리뷰를 삭제할까요?')) {
-      await deleteDoc(doc(db, 'reviews', reviewId));
+      try {
+        await deleteDoc(doc(db, 'reviews', reviewId));
+      } catch (err) {
+        alert("삭제 권한이 없습니다.");
+      }
     }
   };
 
@@ -152,7 +174,7 @@ const GameDetails: React.FC<GameDetailsProps> = ({ user }) => {
           {/* Reviews Section */}
           <div className="border-t pt-8">
             <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center">
-              <i className="fas fa-comments text-pink-400 mr-2"></i> 친구들의 리뷰
+              <i className="fas fa-comments text-pink-400 mr-2"></i> 친구들의 리뷰 ({reviews.length})
             </h2>
 
             {user ? (
